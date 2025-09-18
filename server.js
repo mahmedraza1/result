@@ -38,8 +38,14 @@ app.get('/api/result/:roll', async (req, res) => {
 // Serve static assets from the dist directory (after building the frontend)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// For any route that doesn't match an API route, serve the index.html
-app.get('*', (req, res) => {
+// For any route that doesn't match an API route or static files, serve the index.html
+app.use((req, res, next) => {
+  // If the request is for the API, continue to the next middleware
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  
+  // Otherwise serve the index.html file
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
