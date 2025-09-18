@@ -1,0 +1,190 @@
+
+import { useEffect, useState } from 'react';
+import './App.css';
+
+function App() {
+  const [cycle, se            }
+          }
+          
+          return (le] = useState(0);
+  const [roll, setRoll] = useState(409360); // starting roll number
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const BATCH_SIZE = 10; // Process 10 requests at a time
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchBatch = async () => {
+      if (cycle < 100) {
+        setLoading(true);
+        try {
+          // Create an array of 10 promises (or less for the final batch)
+          const remaining = 100 - cycle;
+          const batchCount = Math.min(BATCH_SIZE, remaining);
+          const promises = [];
+          
+          for (let i = 0; i < batchCount; i++) {
+            const currentRoll = roll + i;
+            promises.push(
+              fetch(`http://localhost:3001/api/result/${currentRoll}`)
+                .then(res => res.json())
+            );
+          }
+          
+          // Wait for all promises to resolve
+          const batchResults = await Promise.all(promises);
+          
+          if (isMounted) {
+            setResults(prevResults => [...prevResults, ...batchResults]);
+            setRoll(r => r + batchCount);
+            setCycle(c => c + batchCount);
+            setLoading(false);
+          }
+        } catch (err) {
+          if (isMounted) {
+            setError(`Error fetching results: ${err.message}`);
+            setLoading(false);
+          }
+        }
+      }
+    };
+    
+    fetchBatch();
+    return () => { isMounted = false; };
+  }, [cycle, roll]);
+
+  return (
+    <div className="App">
+      <h1>BISE FSD Result Fetcher</h1>
+      <h2>Progress: {cycle} / 100</h2>
+      <h3>Current Roll Number: {roll}</h3>
+      {loading && <p>Loading batch of {BATCH_SIZE} requests...</p>}
+      {error && <p style={{color: 'red'}}>{error}</p>}
+      
+      <div className="results-container" style={{
+        maxHeight: '500px',
+        overflow: 'auto',
+        border: '1px solid #ccc',
+        padding: '10px',
+        margin: '10px 0'
+      }}>
+        <h3>Results ({results.length}):</h3>
+        {results.map((result, index) => {
+          // Parse the raw result text to extract structured data
+          const resultText = result.result || '';
+          
+          // Extract basic student info
+          const rollNoMatch = resultText.match(/Roll No:\s+(\d+)/);
+          const nameMatch = resultText.match(/Name:\s+([^\n]+)/);
+          const fatherNameMatch = resultText.match(/Father's Name:\s+([^\n]+)/);
+          
+          // Extract subjects and marks
+          const subjects = [];
+          // Try to find the table structure by looking for patterns in the result text
+          const tableData = resultText.match(/Serial No\.Name of SubjectsMaximum MarksPart IPart II.*?Go Back/s);
+          
+          if (tableData) {
+            // Extract each subject row 
+            const subjectPattern = /(\d+)([A-Z][A-Za-z\s]+)(\d+)([0-9]+)?([0-9]+)?\+?([0-9]+)?([0-9.]+)([A-Z][+]?)([0-9]+)/g;
+            let match;
+            
+            while ((match = subjectPattern.exec(tableData[0])) !== null) {
+              subjects.push({
+                serialNo: match[1],
+                name: match[2].trim(),
+                maxMarks: match[3],
+                part1: match[4] || '-',
+                part2: match[5] || '-',
+                practical: match[6] || '-',
+                percentile: match[7],
+                grade: match[8],
+                total: match[9]
+              });
+            }
+          }
+          }
+          
+          return (
+            <div key={index} style={{
+              background: '#f4f4f4', 
+              padding: '1em', 
+              margin: '1em 0',
+              borderBottom: '1px solid #ddd'
+            }}>
+              <h4>Roll Number: {result.rollNumber}</h4>
+              
+              {/* Student Details */}
+              <div style={{ marginBottom: '15px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '5px', border: '1px solid #ddd' }}>Roll Number</th>
+                      <td style={{ padding: '5px', border: '1px solid #ddd' }}>{rollNoMatch ? rollNoMatch[1] : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '5px', border: '1px solid #ddd' }}>Name</th>
+                      <td style={{ padding: '5px', border: '1px solid #ddd' }}>{nameMatch ? nameMatch[1] : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '5px', border: '1px solid #ddd' }}>Father's Name</th>
+                      <td style={{ padding: '5px', border: '1px solid #ddd' }}>{fatherNameMatch ? fatherNameMatch[1] : 'N/A'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Subjects Table */}
+              {subjects.length > 0 && (
+                <div>
+                  <h5>Subject Results</h5>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#e0e0e0' }}>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Sr.</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Subject</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Max</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Part I</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Part II</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Practical</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>%</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Grade</th>
+                        <th style={{ padding: '5px', border: '1px solid #ddd' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjects.map((subject, idx) => (
+                        <tr key={idx}>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.serialNo}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd' }}>{subject.name}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.maxMarks}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.part1}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.part2}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.practical}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.percentile}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.grade}</td>
+                          <td style={{ padding: '5px', border: '1px solid #ddd', textAlign: 'center' }}>{subject.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              
+              {/* Show raw data in a collapsible section */}
+              <details style={{ marginTop: '15px' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>Raw Data</summary>
+                <pre style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>{JSON.stringify(result, null, 2)}</pre>
+              </details>
+            </div>
+          );
+        })}
+      </div>
+      
+      {cycle >= 100 && <h2>All 100 cycles completed!</h2>}
+    </div>
+  );
+}
+
+export default App;
