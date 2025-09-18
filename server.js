@@ -1,13 +1,19 @@
-// Simple Express server to fetch and serve data from bisefsd.edu.pk
+// Express server to fetch data and serve frontend
 import express from 'express';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get directory name in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 5000;
 
-
+// Enable CORS
 app.use(cors());
 
 // Helper to fetch result HTML
@@ -29,6 +35,16 @@ app.get('/api/result/:roll', async (req, res) => {
   res.json(result);
 });
 
+// Serve static assets from the dist directory (after building the frontend)
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// For any route that doesn't match an API route, serve the index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`- API: http://result.mahmedraza.fun:5000/api/result/{roll-number}`);
+  console.log(`- Frontend: http://result.mahmedraza.fun:5000/`);
 });

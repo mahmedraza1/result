@@ -11,9 +11,15 @@ export default function ResultViewer() {
   const [concurrency, setConcurrency] = useState(10);
 
   const fetchBatch = async (ids) => {
+    // Get the base URL - use the current domain in production, or the API URL in development
+    const apiBase = 
+      process.env.NODE_ENV === 'production' 
+        ? '' // Empty string means use the same domain
+        : 'http://result.mahmedraza.fun:5000';
+        
     const responses = await Promise.all(
       ids.map((id) =>
-        fetch(`http://localhost:3001/api/result/${id}`)
+        fetch(`${apiBase}/api/result/${id}`)
           .then((res) => res.json())
           .then((data) => ({ id, html: data.result || data.error }))
           .catch((err) => ({ id, html: `<p>Error loading ${id}: ${err.message}</p>` }))
