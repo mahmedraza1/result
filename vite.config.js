@@ -32,9 +32,12 @@ export default defineConfig({
     // Proxy API requests in development
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        // Dynamically set the target based on hostname
+        target: process.env.NODE_ENV === 'production' ? 'http://result.mahmedraza.fun:5000' : 'http://localhost:5000',
         changeOrigin: true,
       },
     },
+    // Allow access from any hostname
+    host: '0.0.0.0',
   },
 })

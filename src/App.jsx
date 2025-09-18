@@ -1,28 +1,61 @@
 import React, { useState, useEffect } from "react";
+import config, { getApiBaseUrl } from "./config";
 
 export default function ResultViewer() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
+  const [useProxy, setUseProxy] = useState(false);
+  const [errorCount, setErrorCount] = useState(0);
 
   // Form states
-  const [startId, setStartId] = useState(409360);
-  const [total, setTotal] = useState(100);
-  const [concurrency, setConcurrency] = useState(10);
+  const [startId, setStartId] = useState(config.defaultStartId);
+  const [total, setTotal] = useState(config.defaultTotal);
+  const [concurrency, setConcurrency] = useState(config.batchSize);
 
   const fetchBatch = async (ids) => {
-    // Get the base URL - use the current domain in production, or the API URL in development
-    const apiBase = 
-      process.env.NODE_ENV === 'production' 
-        ? '' // Empty string means use the same domain
-        : 'http://result.mahmedraza.fun:5000';
-        
+    // Get the base URL from our config helper
+    const apiBase = getApiBaseUrl();
+    
+    // First check API health
+    try {
+      const healthCheck = await fetch(`${apiBase}/api/health`).then(res => res.json());
+      console.log('API health check:', healthCheck);
+    } catch (err) {
+      console.error('API health check failed:', err);
+      // Continue anyway, individual requests will handle errors
+    }
+    
     const responses = await Promise.all(
       ids.map((id) =>
-        fetch(`${apiBase}/api/result/${id}`)
-          .then((res) => res.json())
-          .then((data) => ({ id, html: data.result || data.error }))
-          .catch((err) => ({ id, html: `<p>Error loading ${id}: ${err.message}</p>` }))
+        fetch(`${apiBase}/api/result/${id}${useProxy ? '?proxy=true' : ''}`)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`Server responded with status ${res.status}`);
+            }
+            return res.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              // Server returned an error
+              return { 
+                id, 
+                html: `<div class="bg-red-50 p-4 rounded-md text-red-700 mb-4">
+                         <p class="font-bold">Error:</p>
+                         <p>${data.error}</p>
+                         ${data.errorDetail ? `<p class="text-sm mt-2">${data.errorDetail}</p>` : ''}
+                       </div>` 
+              };
+            }
+            return { id, html: data.result || 'No data returned' };
+          })
+          .catch((err) => ({ 
+            id, 
+            html: `<div class="bg-red-50 p-4 rounded-md text-red-700">
+                    <p class="font-bold">Request Error:</p>
+                    <p>${err.message}</p>
+                   </div>` 
+          }))
       )
     );
     return responses;
@@ -230,9 +263,11 @@ export default function ResultViewer() {
         {/* Results list */}
         {started && results.length > 0 && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-800 pb-2 border-b border-gray-200 mb-4">
-              Results ({results.length} records)
-            </h2>
+            <div className="pb-2 border-b border-gray-200 mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                Results ({results.length} records)
+              </h2>
+            </div>
             
             {results.map((item) => (
               <div
@@ -257,7 +292,7 @@ export default function ResultViewer() {
                   </button>
                 </div>
                 <div className="border rounded-lg p-4 overflow-auto bg-gray-50">
-                  <div dangerouslySetInnerHTML={{ __html: item.html }} />
+                  <div id={`result-${item.id}`} dangerouslySetInnerHTML={{ __html: item.html }} />
                 </div>
               </div>
             ))}
